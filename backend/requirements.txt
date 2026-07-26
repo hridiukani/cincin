@@ -5,6 +5,8 @@ sqlalchemy
 geoalchemy2
 python-dotenv
 playwright
-openai
+groq
 pymupdf
 httpx
+google-auth
+requests

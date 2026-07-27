@@ -9,58 +9,61 @@ load_dotenv()
 
 GOOGLE_PLACES_API_KEY = os.environ["GOOGLE_PLACES_API_KEY"]
 
-NEARBY_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
+SEARCH_TEXT_URL = "https://places.googleapis.com/v1/places:searchText"
+
+FIELD_MASK = ",".join(
+    [
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.location",
+        "places.rating",
+        "places.websiteUri",
+        "places.internationalPhoneNumber",
+        "nextPageToken",
+    ]
+)
 
 PLACE_TYPES = ["bar", "restaurant"]
 NEXT_PAGE_TOKEN_DELAY_SECONDS = 2
 
 
-def _nearby_search_page(client: httpx.Client, lat: float, lng: float, radius: int, place_type: str, page_token: str | None = None) -> dict:
-    params = {"key": GOOGLE_PLACES_API_KEY}
+def _search_text_page(client: httpx.Client, lat: float, lng: float, radius: int, place_type: str, page_token: str | None = None) -> dict:
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+        "X-Goog-FieldMask": FIELD_MASK,
+    }
+    body = {
+        "textQuery": place_type,
+        "includedType": place_type,
+        "locationBias": {
+            "circle": {
+                "center": {"latitude": lat, "longitude": lng},
+                "radius": radius,
+            }
+        },
+    }
     if page_token:
-        # A freshly issued next_page_token isn't valid yet; Google requires
+        # A freshly issued nextPageToken isn't valid yet; Google requires
         # a short delay before it can be used.
         time.sleep(NEXT_PAGE_TOKEN_DELAY_SECONDS)
-        params["pagetoken"] = page_token
-    else:
-        params.update({"location": f"{lat},{lng}", "radius": radius, "type": place_type})
+        body["pageToken"] = page_token
 
-    response = client.get(NEARBY_SEARCH_URL, params=params)
+    response = client.post(SEARCH_TEXT_URL, headers=headers, json=body)
     response.raise_for_status()
-    data = response.json()
-
-    if data["status"] not in ("OK", "ZERO_RESULTS"):
-        raise RuntimeError(f"Places Nearby Search error: {data['status']} - {data.get('error_message', '')}")
-
-    return data
+    return response.json()
 
 
 def _search_nearby(client: httpx.Client, lat: float, lng: float, radius: int, place_type: str) -> list[dict]:
     results = []
     page_token = None
     while True:
-        data = _nearby_search_page(client, lat, lng, radius, place_type, page_token)
-        results.extend(data.get("results", []))
-        page_token = data.get("next_page_token")
+        data = _search_text_page(client, lat, lng, radius, place_type, page_token)
+        results.extend(data.get("places", []))
+        page_token = data.get("nextPageToken")
         if not page_token:
             return results
-
-
-def _get_details(client: httpx.Client, place_id: str) -> dict:
-    params = {
-        "place_id": place_id,
-        "fields": "website,formatted_phone_number",
-        "key": GOOGLE_PLACES_API_KEY,
-    }
-    response = client.get(DETAILS_URL, params=params)
-    response.raise_for_status()
-    data = response.json()
-
-    if data["status"] != "OK":
-        return {}
-
-    return data.get("result", {})
 
 
 def fetch_venues(lat: float, lng: float, radius: int) -> list[dict]:
@@ -68,21 +71,20 @@ def fetch_venues(lat: float, lng: float, radius: int) -> list[dict]:
         places_by_id = {}
         for place_type in PLACE_TYPES:
             for place in _search_nearby(client, lat, lng, radius, place_type):
-                places_by_id.setdefault(place["place_id"], place)
+                places_by_id.setdefault(place["id"], place)
 
         venues = []
         for place_id, place in places_by_id.items():
-            details = _get_details(client, place_id)
-            location = place.get("geometry", {}).get("location", {})
+            location = place.get("location", {})
             venues.append(
                 {
                     "google_place_id": place_id,
-                    "name": place.get("name"),
-                    "address": place.get("vicinity"),
-                    "lat": location.get("lat"),
-                    "lng": location.get("lng"),
-                    "website": details.get("website"),
-                    "phone": details.get("formatted_phone_number"),
+                    "name": place.get("displayName", {}).get("text"),
+                    "address": place.get("formattedAddress"),
+                    "lat": location.get("latitude"),
+                    "lng": location.get("longitude"),
+                    "website": place.get("websiteUri"),
+                    "phone": place.get("internationalPhoneNumber"),
                     "google_rating": place.get("rating"),
                 }
             )

@@ -2,7 +2,7 @@
 
 > *Cincin* — Italian for "cheers"
 
-**Cincin** is an AI-powered happy hour aggregator for Phoenix, AZ. Instead of digging through outdated Yelp pages or bar websites, Cincin automatically finds, extracts, and surfaces happy hour deals near you — in real time.
+**Cincin** is an AI-powered happy hour aggregator for Phoenix, AZ (as of now). Instead of digging through outdated Yelp pages or bar websites, Cincin automatically finds, extracts, and surfaces happy hour deals near you — in real time.
 
 ---
 

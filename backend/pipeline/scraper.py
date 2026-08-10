@@ -11,6 +11,25 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 PAGE_TIMEOUT_MS = 15_000
+# Best-effort extra wait for JS-rendered content once the DOM is ready. Many
+# bar/restaurant sites never reach full "networkidle" (chat widgets, ad and
+# analytics beacons, live sockets), so we cap this and proceed regardless.
+NETWORKIDLE_SETTLE_MS = 5_000
+
+
+async def _settle(page) -> None:
+    # Give client-rendered content a chance to appear, but never fail the load
+    # just because the network never goes fully idle.
+    try:
+        await page.wait_for_load_state("networkidle", timeout=NETWORKIDLE_SETTLE_MS)
+    except PlaywrightTimeoutError:
+        pass
+
+
+async def _goto(page, url: str) -> None:
+    await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+    await _settle(page)
+
 
 # Words that flag happy-hour / specials content in link text or page body.
 HH_KEYWORDS = re.compile(r"\b(happy\s*hour|specials|deals|drink specials|drinks|hh)\b", re.I)
@@ -67,7 +86,7 @@ async def load_page(url: str) -> dict | None:
         browser = await p.chromium.launch(headless=True)
         try:
             page = await browser.new_page()
-            await page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT_MS)
+            await _goto(page, url)
             html = await page.content()
             text = await page.inner_text("body")
             print(f"[scraper] OK   {url}")
@@ -82,7 +101,7 @@ async def load_page(url: str) -> dict | None:
 async def handle_link(browser: Browser, url: str) -> str | None:
     page = await browser.new_page()
     try:
-        await page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT_MS)
+        await _goto(page, url)
         text = await page.inner_text("body")
         print(f"[handle_link] OK   {url}")
         return text
@@ -123,7 +142,7 @@ async def handle_pdf(pdf_url: str) -> str | None:
 async def handle_location_selector(browser: Browser, base_url: str) -> str | None:
     page = await browser.new_page()
     try:
-        await page.goto(base_url, wait_until="networkidle", timeout=PAGE_TIMEOUT_MS)
+        await _goto(page, base_url)
 
         option = page.locator(
             "a[href*='location' i], button:has-text('location'), "
@@ -134,7 +153,7 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
             return await page.inner_text("body")
 
         await option.click()
-        await page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT_MS)
+        await _settle(page)
 
         html = await page.content()
         text = await page.inner_text("body")

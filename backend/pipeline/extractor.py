@@ -45,6 +45,14 @@ SYSTEM_PROMPT = (
     "  * medium: happy hour is clearly mentioned but some detail (days, times, or deals) "
     "is missing or vague.\n"
     "  * low: only a passing or ambiguous mention with little concrete detail.\n"
+    "- IMPORTANT: A happy hour may be described WITHOUT the words \"happy hour\". Set "
+    "has_happy_hour to true and extract the details whenever you see any of the following:\n"
+    "  * Time-based pricing, e.g. \"3pm-6pm $3 beers\" or \"$5 wells until 7pm\".\n"
+    '  * "Daily specials", "drink specials", "weekday deals", or similar recurring specials.\n'
+    "  * Any discounted or reduced pricing tied to a specific time window.\n"
+    '  * "Late night" specials that include a time range (e.g. "late night 10pm-close").\n'
+    "  Capture the days, time window, and discounted items into days/start_time/end_time/deals "
+    "just as you would for an explicit happy hour.\n"
 )
 
 STRICT_SYSTEM_PROMPT = (
@@ -64,6 +72,7 @@ def _call_groq(client: Groq, system_prompt: str, user_content: str) -> str:
     response = client.chat.completions.create(
         model=MODEL,
         temperature=0,
+        max_tokens=1000,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},

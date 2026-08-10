@@ -52,6 +52,16 @@ def _is_pdf_href(href: str) -> bool:
     return href.split("?")[0].split("#")[0].lower().endswith(".pdf")
 
 
+# A PDF is only worth parsing if its link text or URL hints at drinks/food/deals.
+# This filters out privacy policies, allergen charts, accessibility docs, etc.
+PDF_KEYWORDS = ("menu", "drink", "cocktail", "beer", "wine", "special", "happy", "hh", "food")
+
+
+def _pdf_is_relevant(link_text: str, href: str) -> bool:
+    haystack = f"{link_text} {href}".lower()
+    return any(keyword in haystack for keyword in PDF_KEYWORDS)
+
+
 def detect_pattern(html: str, text: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     anchors = soup.find_all("a", href=True)
@@ -65,10 +75,12 @@ def detect_pattern(html: str, text: str) -> dict:
                 return {"pattern": "pdf", "target": href}
             return {"pattern": "link", "target": href}
 
-    # 2. Any standalone PDF link (e.g. a menu PDF) worth parsing.
+    # 2. A standalone PDF link, but only if it looks drink/food/deal-related.
+    #    An unrelated PDF (privacy policy, allergen chart, ...) is not a "pdf".
     for a in anchors:
-        if _is_pdf_href(a["href"]):
-            return {"pattern": "pdf", "target": a["href"]}
+        href = a["href"]
+        if _is_pdf_href(href) and _pdf_is_relevant(a.get_text(" ", strip=True), href):
+            return {"pattern": "pdf", "target": href}
 
     # 3. A location chooser that must be interacted with before content loads.
     if LOCATION_KEYWORDS.search(text):

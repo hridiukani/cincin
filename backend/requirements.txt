@@ -10,3 +10,4 @@ pymupdf
 httpx
 google-auth
 requests
+beautifulsoup4

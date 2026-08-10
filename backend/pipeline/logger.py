@@ -35,6 +35,7 @@ def save_happy_hour(db, venue_id, extraction_result, raw_text):
         "deals": extraction_result["deals"],
         "confidence": extraction_result["confidence"],
         "source": extraction_result["source"],
+        "notes": extraction_result["notes"],
         "raw_text": raw_text,
         "last_verified": now,
     }

@@ -53,6 +53,7 @@ class HappyHour(Base):
     start_time = Column(Time, nullable=True)
     end_time = Column(Time, nullable=True)
     deals = Column(ARRAY(Text), nullable=False)
+    deal_type = Column(Text, nullable=False, server_default="happy_hour")
     confidence = Column(String, nullable=False)
     source = Column(String, nullable=False)
     notes = Column(Text, nullable=True)

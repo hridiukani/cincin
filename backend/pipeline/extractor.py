@@ -13,28 +13,40 @@ MAX_INPUT_CHARS = 12_000
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _CONFIDENCE = {"high", "medium", "low"}
 _SOURCE = {"website", "reviews", "both"}
+_DEAL_TYPE = {"happy_hour", "lunch_special", "late_night", "weekday_deal", "early_bird", "other"}
 
 SYSTEM_PROMPT = (
-    "You are a data extraction engine that identifies happy hour information from "
-    "restaurant and bar website text.\n\n"
+    "You are a data extraction engine that identifies recurring, time-based dining and "
+    "drink deals from restaurant and bar website text.\n\n"
     "Return ONLY a single valid JSON object and nothing else. Do not include any "
     "explanation, preamble, or markdown code fences (no ```). The first character of "
     "your response must be '{' and the last must be '}'.\n\n"
+    "A deal is any recurring discounted or special pricing tied to specific hours or days. "
+    "Classify each into one deal_type:\n"
+    "- happy_hour: discounted drinks and/or food during a set window.\n"
+    "- lunch_special: a set-price or discounted menu during lunch hours.\n"
+    "- late_night: deals available late, roughly after 9pm or 10pm.\n"
+    "- weekday_deal: a recurring discount tied to specific weekday(s).\n"
+    "- early_bird: discounts for dining before a certain time.\n"
+    "- other: a time-based deal that fits none of the above.\n\n"
     "Use exactly this schema:\n"
     "{\n"
-    '  "has_happy_hour": boolean,\n'
+    '  "has_deal": boolean,\n'
+    '  "deal_type": "happy_hour" | "lunch_special" | "late_night" | "weekday_deal" | "early_bird" | "other",\n'
     '  "days": ["Monday", "Tuesday", ...],\n'
     '  "start_time": "HH:MM" (24-hour) or null,\n'
     '  "end_time": "HH:MM" (24-hour) or null,\n'
-    '  "deals": ["$3 draft beers", "$5 margaritas", ...],\n'
+    '  "deals": ["$12 burger + fries", "$5 margaritas", ...],\n'
     '  "confidence": "high" | "medium" | "low",\n'
     '  "source": "website" | "reviews" | "both",\n'
     '  "notes": string or null\n'
     "}\n\n"
     "Rules:\n"
-    "- If the text contains no happy hour information, set has_happy_hour to false, "
-    'days and deals to empty arrays, start_time/end_time/notes to null, confidence to '
-    '"low", and source to "website".\n'
+    "- If the text contains no time-based deal, set has_deal to false, deal_type to "
+    '"other", days and deals to empty arrays, start_time/end_time/notes to null, '
+    'confidence to "low", and source to "website".\n'
+    "- Only one deal is stored per venue, so when several are present pick the single most "
+    "prominent one and set deal_type accordingly (note the others in notes if useful).\n"
     "- Use full weekday names. Expand ranges like \"Mon-Fri\" into each individual day.\n"
     '- Times must be 24-hour zero-padded HH:MM. Convert "3pm" to "15:00", "4:30 PM" to "16:30".\n'
     "- deals are short human-readable strings drawn from the text.\n"
@@ -42,17 +54,18 @@ SYSTEM_PROMPT = (
     '"reviews" for customer review text, "both" if mixed.\n'
     "- Set confidence using this guidance:\n"
     "  * high: explicit days AND times AND at least one specific deal are clearly stated.\n"
-    "  * medium: happy hour is clearly mentioned but some detail (days, times, or deals) "
-    "is missing or vague.\n"
+    "  * medium: a deal is clearly present but some detail (days, times, or deals) is "
+    "missing or vague.\n"
     "  * low: only a passing or ambiguous mention with little concrete detail.\n"
-    "- IMPORTANT: A happy hour may be described WITHOUT the words \"happy hour\". Set "
-    "has_happy_hour to true and extract the details whenever you see any of the following:\n"
+    "- IMPORTANT: A deal may be described WITHOUT an explicit label like \"happy hour\". "
+    "Set has_deal to true and extract the details whenever you see any of the following:\n"
     "  * Time-based pricing, e.g. \"3pm-6pm $3 beers\" or \"$5 wells until 7pm\".\n"
     '  * "Daily specials", "drink specials", "weekday deals", or similar recurring specials.\n'
     "  * Any discounted or reduced pricing tied to a specific time window.\n"
+    "  * A set-price or discounted lunch menu during lunch hours.\n"
     '  * "Late night" specials that include a time range (e.g. "late night 10pm-close").\n'
-    "  Capture the days, time window, and discounted items into days/start_time/end_time/deals "
-    "just as you would for an explicit happy hour.\n"
+    "  * Early-bird pricing for dining before a certain time.\n"
+    "  Capture the days, time window, and discounted items into days/start_time/end_time/deals.\n"
 )
 
 STRICT_SYSTEM_PROMPT = (
@@ -84,14 +97,16 @@ def _call_groq(client: Groq, system_prompt: str, user_content: str) -> str:
 def _validate(parsed: object) -> bool:
     if not isinstance(parsed, dict):
         return False
-    if not isinstance(parsed.get("has_happy_hour"), bool):
+    if not isinstance(parsed.get("has_deal"), bool):
         return False
-    if not parsed["has_happy_hour"]:
+    if not parsed["has_deal"]:
         return True
 
-    for key in ("days", "start_time", "end_time", "deals", "confidence", "source", "notes"):
+    for key in ("deal_type", "days", "start_time", "end_time", "deals", "confidence", "source", "notes"):
         if key not in parsed:
             return False
+    if parsed["deal_type"] not in _DEAL_TYPE:
+        return False
     if not (isinstance(parsed["days"], list) and all(isinstance(d, str) for d in parsed["days"])):
         return False
     if not (isinstance(parsed["deals"], list) and all(isinstance(d, str) for d in parsed["deals"])):
@@ -128,7 +143,7 @@ def extract_happy_hour(text: str, venue_name: str) -> dict | None:
         # Retry once with a stricter prompt before giving up.
         parsed = _parse_and_validate(_call_groq(client, STRICT_SYSTEM_PROMPT, user_content))
 
-    if parsed is None or not parsed["has_happy_hour"]:
+    if parsed is None or not parsed["has_deal"]:
         return None
     return parsed
 

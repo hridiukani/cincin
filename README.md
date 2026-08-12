@@ -29,7 +29,7 @@
 - [SQLAlchemy](https://www.sqlalchemy.org/) — ORM
 
 ### AI Pipeline
-- [GPT-4o](https://openai.com/) — happy hour data extraction from unstructured text
+- [GPT-4o](https://openai.com/)/[Groq] — happy hour data extraction from unstructured text
 - [Playwright](https://playwright.dev/python/) — headless browser scraping
 - [PyMuPDF](https://pymupdf.readthedocs.io/) — PDF menu parsing
 - [Google Places API](https://developers.google.com/maps/documentation/places/web-service) — venue seeding

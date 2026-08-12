@@ -33,6 +33,7 @@ def save_happy_hour(db, venue_id, extraction_result, raw_text):
         "start_time": _parse_time(extraction_result["start_time"]),
         "end_time": _parse_time(extraction_result["end_time"]),
         "deals": extraction_result["deals"],
+        "deal_type": extraction_result["deal_type"],
         "confidence": extraction_result["confidence"],
         "source": extraction_result["source"],
         "notes": extraction_result["notes"],

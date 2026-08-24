@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from db.database import SessionLocal
-from db.models import Venue
+from db.models import ScrapeLog, Venue
 from pipeline.extractor import extract_happy_hour
 from pipeline.logger import log_scrape, save_happy_hour
 from pipeline.scraper import scrape_venue
@@ -14,10 +14,19 @@ from pipeline.scraper import scrape_venue
 DELAY_SECONDS = 4
 
 
-def _fetch_venues(db, venue_id, limit):
+def _fetch_venues(db, venue_id, limit, skip=False):
     query = db.query(Venue).filter(Venue.website.isnot(None), Venue.website != "")
     if venue_id:
         query = query.filter(Venue.id == venue_id)
+
+    if skip:
+        already_scraped = db.query(ScrapeLog.venue_id).distinct()
+        eligible_count = query.count()
+        query = query.filter(Venue.id.notin_(already_scraped))
+        remaining_count = query.count()
+        skipped_count = eligible_count - remaining_count
+        print(f"Skipping {skipped_count} already-scraped venues, running {remaining_count} remaining")
+
     query = query.order_by(Venue.name)
     venues = query.all()
     if limit is not None:
@@ -57,11 +66,11 @@ async def _process_venue(db, venue, index, total):
     return "extracted"
 
 
-async def run(venue_id=None, limit=None):
+async def run(venue_id=None, limit=None, skip=False):
     db = SessionLocal()
     counts = {"extracted": 0, "no_hh": 0, "failed": 0}
     try:
-        venues = _fetch_venues(db, venue_id, limit)
+        venues = _fetch_venues(db, venue_id, limit, skip=skip)
         total = len(venues)
         if total == 0:
             print("No venues matched.")
@@ -84,9 +93,12 @@ def main():
     parser = argparse.ArgumentParser(description="Run the Cincin scrape + extract pipeline")
     parser.add_argument("--limit", type=int, default=None, help="Max number of venues to process (default: all)")
     parser.add_argument("--venue-id", default=None, help="Process only this venue id")
+    parser.add_argument(
+        "--skip", action="store_true", help="Skip venues that already have a scrape_log row"
+    )
     args = parser.parse_args()
 
-    asyncio.run(run(venue_id=args.venue_id, limit=args.limit))
+    asyncio.run(run(venue_id=args.venue_id, limit=args.limit, skip=args.skip))
 
 
 if __name__ == "__main__":

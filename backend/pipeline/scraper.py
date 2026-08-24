@@ -31,6 +31,29 @@ async def _goto(page, url: str) -> None:
     await _settle(page)
 
 
+# Keywords used to locate the deal-relevant part of a page's body text.
+_WINDOW_KEYWORDS = [
+    "happy hour", "happy-hour", "hh", "specials", "lunch special",
+    "late night", "deals", "drink special", "weekday",
+]
+_WINDOW_KEYWORD_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in _WINDOW_KEYWORDS) + r")\b", re.I
+)
+WINDOW_BEFORE = 1_000
+WINDOW_AFTER = 2_000
+WINDOW_FALLBACK_CHARS = 3_000
+
+
+def _relevant_window(text: str) -> str:
+    match = _WINDOW_KEYWORD_RE.search(text)
+    if match is None:
+        # No deal keyword anywhere: menus/deals tend to sit lower on the page
+        # than navigation and hero content, so prefer the tail over the head.
+        return text[-WINDOW_FALLBACK_CHARS:]
+    idx = match.start()
+    return text[max(0, idx - WINDOW_BEFORE) : idx + WINDOW_AFTER]
+
+
 # Words that flag happy-hour / specials content in link text or page body.
 HH_KEYWORDS = re.compile(r"\b(happy\s*hour|specials|deals|drink specials|drinks|hh)\b", re.I)
 
@@ -100,7 +123,7 @@ async def load_page(url: str) -> dict | None:
             page = await browser.new_page()
             await _goto(page, url)
             html = await page.content()
-            text = await page.inner_text("body")
+            text = _relevant_window(await page.inner_text("body"))
             print(f"[scraper] OK   {url}")
             return {"html": html, "text": text}
         except (PlaywrightTimeoutError, PlaywrightError) as e:
@@ -114,7 +137,7 @@ async def handle_link(browser: Browser, url: str) -> str | None:
     page = await browser.new_page()
     try:
         await _goto(page, url)
-        text = await page.inner_text("body")
+        text = _relevant_window(await page.inner_text("body"))
         print(f"[handle_link] OK   {url}")
         return text
     except (PlaywrightTimeoutError, PlaywrightError) as e:
@@ -162,13 +185,13 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
         ).first
         if await option.count() == 0:
             print(f"[handle_location_selector] no location option found at {base_url}")
-            return await page.inner_text("body")
+            return _relevant_window(await page.inner_text("body"))
 
         await option.click()
         await _settle(page)
 
         html = await page.content()
-        text = await page.inner_text("body")
+        text = _relevant_window(await page.inner_text("body"))
 
         # After selecting a location the real content is loaded, so re-detect:
         # the happy-hour info may now sit behind a fresh link to follow.

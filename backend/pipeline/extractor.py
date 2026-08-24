@@ -7,7 +7,7 @@ from groq import Groq
 
 load_dotenv()
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-20b"
 MAX_INPUT_CHARS = 12_000
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")

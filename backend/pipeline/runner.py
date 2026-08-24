@@ -11,7 +11,7 @@ from pipeline.extractor import extract_happy_hour
 from pipeline.logger import log_scrape, save_happy_hour
 from pipeline.scraper import scrape_venue
 
-DELAY_SECONDS = 2
+DELAY_SECONDS = 4
 
 
 def _fetch_venues(db, venue_id, limit):

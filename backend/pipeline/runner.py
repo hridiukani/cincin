@@ -34,6 +34,19 @@ def _fetch_venues(db, venue_id, limit, skip=False):
     return venues
 
 
+def _fetch_failed_venues(db, venue_id, limit):
+    failed_ids = db.query(ScrapeLog.venue_id).filter(ScrapeLog.success.is_(False)).distinct()
+    query = db.query(Venue).filter(Venue.id.in_(failed_ids))
+    if venue_id:
+        query = query.filter(Venue.id == venue_id)
+    query = query.order_by(Venue.name)
+    venues = query.all()
+    if limit is not None:
+        venues = venues[:limit]
+    print(f"Retrying {len(venues)} previously failed venues")
+    return venues
+
+
 async def _process_venue(db, venue, index, total):
     label = f"[{index}/{total}] {venue.name}"
 
@@ -66,11 +79,14 @@ async def _process_venue(db, venue, index, total):
     return "extracted"
 
 
-async def run(venue_id=None, limit=None, skip=False):
+async def run(venue_id=None, limit=None, skip=False, retry_failed=False):
     db = SessionLocal()
     counts = {"extracted": 0, "no_hh": 0, "failed": 0}
     try:
-        venues = _fetch_venues(db, venue_id, limit, skip=skip)
+        if retry_failed:
+            venues = _fetch_failed_venues(db, venue_id, limit)
+        else:
+            venues = _fetch_venues(db, venue_id, limit, skip=skip)
         total = len(venues)
         if total == 0:
             print("No venues matched.")
@@ -96,9 +112,16 @@ def main():
     parser.add_argument(
         "--skip", action="store_true", help="Skip venues that already have a scrape_log row"
     )
+    parser.add_argument(
+        "--retry-failed",
+        action="store_true",
+        help="Only run venues with a failed scrape_log row (ignores --skip for those venues)",
+    )
     args = parser.parse_args()
 
-    asyncio.run(run(venue_id=args.venue_id, limit=args.limit, skip=args.skip))
+    asyncio.run(
+        run(venue_id=args.venue_id, limit=args.limit, skip=args.skip, retry_failed=args.retry_failed)
+    )
 
 
 if __name__ == "__main__":

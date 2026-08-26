@@ -65,9 +65,9 @@ SEARCH_SQL = """
 
 @router.get("/api/venues/search", response_model=list[VenueSearchResult])
 def search_venues(
-    lat: float = Query(..., description="Search center latitude"),
-    lng: float = Query(..., description="Search center longitude"),
-    radius_miles: float = Query(5.0, gt=0, description="Search radius in miles"),
+    lat: float = Query(..., ge=-90, le=90, description="Search center latitude (-90 to 90)"),
+    lng: float = Query(..., ge=-180, le=180, description="Search center longitude (-180 to 180)"),
+    radius_miles: float = Query(5.0, ge=0.1, le=25, description="Search radius in miles (0.1 to 25)"),
     on_now: bool = Query(False, description="Only include deals active right now"),
     deal_type: str | None = Query(
         None,

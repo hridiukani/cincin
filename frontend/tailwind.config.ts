@@ -9,8 +9,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: "#0a0a0f",
+        surface: "#13131a",
+        border: "#ffffff10",
+        primary: {
+          DEFAULT: "#f59e0b",
+          hover: "#d97706",
+        },
+        text: {
+          primary: "#f8fafc",
+          muted: "#94a3b8",
+        },
+        live: "#22c55e",
+        deal: "#3b82f6",
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)"],
       },
     },
   },

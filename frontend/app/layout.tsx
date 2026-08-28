@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -25,9 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${inter.variable} font-sans antialiased bg-background text-text-primary`}>
+        <header className="sticky top-0 z-50 h-[57px] flex items-center justify-between px-4 md:px-6 bg-background border-b border-border">
+          <span className="text-xl font-bold text-primary tracking-tight">Cincin</span>
+          <span className="hidden md:block text-sm text-text-muted">Phoenix deals, found.</span>
+        </header>
         {children}
       </body>
     </html>

@@ -15,7 +15,7 @@ interface HeroProps {
 const HANDS = [
   { src: "/hands/hand-1.png", alt: "Hand holding a tall highball cocktail", left: 2, top: 2, size: 20, rot: 20 },
   { src: "/hands/hand-2.png", alt: "Hand holding a rocks glass with citrus", left: 80, top: 25, size: 21, rot: -20, flip: true },
-  { src: "/hands/hand-3.png", alt: "Hand holding a coupe with a straw", left: -2, top: 62, size: 22, rot: -8 ,flip: true},
+  { src: "/hands/hand-3.png", alt: "Hand holding a coupe with a straw", left: -2, top: 70, size: 22, rot: -8 ,flip: true},
   { src: "/hands/hand-4.png", alt: "Hand holding a champagne flute", left: 79, top: 60, size: 22, rot: -10, flip: true },
   { src: "/hands/hand-5.png", alt: "Hand tilting a martini with a cherry", left: 30, top: -4, size: 18, rot: 30 },
   { src: "/hands/hand-6.png", alt: "Hand holding a beer mug", left: 41, top: 70, size: 19, rot: -10 },
@@ -25,7 +25,7 @@ const HANDS = [
 
 export default function Hero({ onSearch, isLoading }: HeroProps) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#2b2420]">
+    <main className="relative min-h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 grain-bg opacity-60" aria-hidden />
 
       <div className="pointer-events-none absolute inset-0">

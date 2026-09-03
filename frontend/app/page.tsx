@@ -38,7 +38,7 @@ export default function Home() {
     <main>
       <Header />
       <div className="px-4 py-4 border-b border-border bg-background sticky top-[57px] z-40">
-        <SearchBar onSearch={handleSearch} isLoading={phase === "loading"} />
+        <SearchBar onSearch={handleSearch} isLoading={phase === "loading"} userLocation={userLocation} />
       </div>
 
       {phase === "loading" && (

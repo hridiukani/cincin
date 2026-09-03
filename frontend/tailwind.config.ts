@@ -9,16 +9,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0a0a0f",
-        surface: "#13131a",
-        border: "#ffffff10",
+        // Matched to the Lovable landing design's .dark palette
+        // (converted precisely from its oklch values, not eyeballed).
+        background: "#1a120c",
+        surface: "#261d16",
+        border: "#ffffff24",
         primary: {
-          DEFAULT: "#f59e0b",
-          hover: "#d97706",
+          DEFAULT: "#f99549",
+          hover: "#d67523",
         },
         text: {
-          primary: "#f8fafc",
-          muted: "#94a3b8",
+          primary: "#f2eee4",
+          muted: "#aba397",
         },
         live: "#22c55e",
         deal: "#3b82f6",

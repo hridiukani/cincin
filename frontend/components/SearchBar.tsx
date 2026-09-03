@@ -6,6 +6,7 @@ import type { SearchOptions } from "@/lib/types";
 interface SearchBarProps {
   onSearch: (lat: number, lng: number, options: SearchOptions) => void;
   isLoading: boolean;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 const RADIUS_OPTIONS = [1, 3, 5, 10];
@@ -35,7 +36,7 @@ function Spinner() {
 const inputClasses =
   "bg-background border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition";
 
-export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
+export default function SearchBar({ onSearch, isLoading, userLocation }: SearchBarProps) {
   const [address, setAddress] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -69,7 +70,17 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   async function handleAddressSearch(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!address.trim()) return;
+
+    if (!address.trim()) {
+      // No new address typed: re-run the search with the updated filters
+      // against wherever the last search was centered, instead of no-op'ing.
+      if (userLocation) {
+        onSearch(userLocation.lat, userLocation.lng, options);
+      } else {
+        setError("Enter an address, or use your location first.");
+      }
+      return;
+    }
 
     setGeocoding(true);
     try {
@@ -80,7 +91,8 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error("Geocoding request failed");
+        setError("Address search is temporarily unavailable. Please try again shortly.");
+        return;
       }
       const data = await response.json();
       const feature = data.features?.[0];
@@ -91,7 +103,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       const [lng, lat] = feature.center;
       onSearch(lat, lng, options);
     } catch {
-      setError("Couldn't find that address. Try being more specific.");
+      setError("Address search is temporarily unavailable. Please try again shortly.");
     } finally {
       setGeocoding(false);
     }
@@ -108,7 +120,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           disabled={busy}
           className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-60 text-background font-semibold rounded-lg px-4 py-2 text-sm whitespace-nowrap transition"
         >
-          {locating ? <Spinner /> : <span>📍</span>}
+          {locating && <Spinner />}
           Use my location
         </button>
 

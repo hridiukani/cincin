@@ -26,7 +26,7 @@ const config: Config = {
         deal: "#3b82f6",
       },
       fontFamily: {
-        sans: ["var(--font-inter)"],
+        sans: ["var(--font-merriweather)"],
         display: ["var(--font-playfair)", "Georgia", "serif"],
       },
     },

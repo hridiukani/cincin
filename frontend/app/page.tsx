@@ -90,7 +90,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="w-full md:w-3/5 order-1 md:order-2 h-[40vh] md:h-auto md:sticky md:top-[57px]">
+          <div className="w-full md:w-3/5 order-1 md:order-2 h-[40vh] md:h-auto md:sticky md:top-[57px] md:self-start">
             <Map
               venues={venues}
               userLocation={userLocation}

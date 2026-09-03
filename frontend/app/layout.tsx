@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Merriweather, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const merriweather = Merriweather({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["300", "400", "700", "900"],
+  variable: "--font-merriweather",
 });
 
 const playfair = Playfair_Display({
@@ -26,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-background text-text-primary`}
+        className={`${merriweather.variable} ${playfair.variable} font-sans antialiased bg-background text-text-primary`}
       >
         {children}
       </body>

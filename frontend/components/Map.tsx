@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import type { Venue } from "@/lib/types";
 import { isLiveNow } from "@/lib/time";
@@ -22,6 +22,11 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
   const onVenueSelectRef = useRef(onVenueSelect);
   onVenueSelectRef.current = onVenueSelect;
 
+  // Markers added before the map's style finishes loading can be silently
+  // dropped during Mapbox's internal load setup, so marker effects wait
+  // for this before touching the map.
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
     if (typeof window === "undefined" || !containerRef.current || mapRef.current) return;
 
@@ -34,6 +39,7 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
       zoom: 12,
     });
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.on("load", () => setMapReady(true));
     mapRef.current = map;
 
     return () => {
@@ -45,7 +51,7 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !userLocation) return;
+    if (!map || !mapReady || !userLocation) return;
 
     if (!userMarkerRef.current) {
       const el = document.createElement("div");
@@ -58,11 +64,11 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
     }
 
     map.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: 13, essential: true });
-  }, [userLocation]);
+  }, [userLocation, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReady) return;
 
     const currentIds = new Set(venues.map((v) => v.id));
     for (const id of Object.keys(markersRef.current)) {
@@ -74,7 +80,7 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
 
     venues.forEach((venue) => {
       const active = isLiveNow(venue.deal);
-      const color = active ? "#f59e0b" : "#3b82f6";
+      const color = active ? "#46f385" : "#f99549";
       const size = active ? 18 : 14;
 
       let entry = markersRef.current[venue.id];
@@ -82,7 +88,6 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
         const el = document.createElement("div");
         el.style.cursor = "pointer";
         el.style.borderRadius = "9999px";
-        el.style.border = "2px solid #0a0a0f";
         el.style.transition = "transform 0.15s ease, box-shadow 0.15s ease";
         el.addEventListener("click", () => onVenueSelectRef.current(venue.id));
 
@@ -107,16 +112,16 @@ export default function Map({ venues, userLocation, selectedVenueId, onVenueSele
       entry.el.style.zIndex = isSelected ? "10" : "1";
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [venues, selectedVenueId]);
+  }, [venues, selectedVenueId, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !selectedVenueId) return;
+    if (!map || !mapReady || !selectedVenueId) return;
     const venue = venues.find((v) => v.id === selectedVenueId);
     if (!venue) return;
     map.flyTo({ center: [venue.lng, venue.lat], zoom: 15, essential: true, speed: 0.8 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVenueId]);
+  }, [selectedVenueId, mapReady]);
 
   return (
     <div

@@ -15,7 +15,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Cincin — Phoenix Happy Hour Finder",
+  title: "Cincin: Phoenix Happy Hour Finder",
   description: "Find happy hours near you in Phoenix, AZ, in real time.",
 };
 

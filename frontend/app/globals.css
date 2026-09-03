@@ -50,3 +50,17 @@ body {
   background: #13131a !important;
   color: #f8fafc !important;
 }
+
+/* Ported from the Lovable landing design (hero background + hand illustrations). */
+.grain-bg {
+  background-image: radial-gradient(rgba(248, 250, 252, 0.08) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+/* The hand-drawn illustrations are ink-on-paper line art; screen-blended and
+   inverted so they read as light ink marks against our dark background. */
+.ink-art {
+  mix-blend-mode: screen;
+  filter: invert(1) hue-rotate(180deg) saturate(1.3) brightness(1.1);
+  opacity: 0.85;
+}

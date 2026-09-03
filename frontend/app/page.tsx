@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Header from "@/components/Header";
+import Hero from "@/components/Hero";
 import SearchBar from "@/components/SearchBar";
 import VenueCard from "@/components/VenueCard";
 import Map from "@/components/Map";
@@ -29,29 +31,12 @@ export default function Home() {
   }
 
   if (phase === "idle") {
-    return (
-      <main className="relative flex flex-col items-center justify-center min-h-[calc(100vh-57px)] px-4">
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: "radial-gradient(circle at 50% 40%, rgba(245,158,11,0.05), transparent 60%)",
-          }}
-        />
-        <div className="relative z-10 flex flex-col items-center text-center gap-6 w-full">
-          <div>
-            <h1 className="text-primary font-bold text-5xl md:text-[64px] leading-tight">Cincin</h1>
-            <p className="text-text-muted text-lg mt-2">
-              Happy hours, lunch deals &amp; more — found instantly
-            </p>
-          </div>
-          <SearchBar onSearch={handleSearch} isLoading={false} />
-        </div>
-      </main>
-    );
+    return <Hero onSearch={handleSearch} isLoading={false} />;
   }
 
   return (
     <main>
+      <Header />
       <div className="px-4 py-4 border-b border-border bg-background sticky top-[57px] z-40">
         <SearchBar onSearch={handleSearch} isLoading={phase === "loading"} />
       </div>

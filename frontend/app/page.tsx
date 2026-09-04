@@ -49,7 +49,7 @@ export default function Home() {
             ))}
           </div>
           <div
-            className="w-full md:w-3/5 order-1 md:order-2 h-[40vh] md:h-auto bg-surface"
+            className="hidden md:block md:w-3/5 order-1 md:order-2 h-[40vh] md:h-auto bg-surface"
             style={{ minHeight: "40vh" }}
           />
         </div>
@@ -57,7 +57,7 @@ export default function Home() {
 
       {phase === "error" && (
         <div className="flex flex-col items-center justify-center text-center py-24 gap-2 px-4">
-          <span className="text-3xl">⚠️</span>
+          
           <p className="text-text-muted">Something went wrong fetching deals. Please try again.</p>
         </div>
       )}
@@ -68,8 +68,8 @@ export default function Home() {
             <div className="p-4">
               {venues.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-16 gap-2">
-                  <span className="text-3xl">🍹</span>
-                  <p className="text-text-muted">No deals found — try a larger radius</p>
+                  
+                  <p className="text-text-muted">No deals found, try a larger radius</p>
                 </div>
               ) : (
                 <>
@@ -90,7 +90,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="w-full md:w-3/5 order-1 md:order-2 h-[40vh] md:h-auto md:sticky md:top-[57px] md:self-start">
+          <div className="hidden md:block md:w-3/5 order-1 md:order-2 md:sticky md:top-[57px] md:self-start">
             <Map
               venues={venues}
               userLocation={userLocation}

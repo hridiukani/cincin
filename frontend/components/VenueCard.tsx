@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { Venue } from "@/lib/types";
 import { formatTime12h, isLiveNow } from "@/lib/time";
 
@@ -16,13 +19,19 @@ const DEAL_TYPE_STYLES: Record<string, { label: string; className: string }> = {
 };
 
 export default function VenueCard({ venue, isSelected, onClick }: VenueCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const dealStyle = DEAL_TYPE_STYLES[venue.deal.deal_type] ?? DEAL_TYPE_STYLES.other;
   const live = isLiveNow(venue.deal);
   const topDeals = venue.deal.deals.slice(0, 3);
 
+  function handleClick() {
+    setExpanded((v) => !v);
+    onClick();
+  }
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className={`bg-surface rounded-xl border cursor-pointer transition p-4 ${
         isSelected
           ? "border-l-[3px] border-l-primary border-t-border border-r-border border-b-border bg-white/[0.03]"
@@ -31,9 +40,20 @@ export default function VenueCard({ venue, isSelected, onClick }: VenueCardProps
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-bold text-text-primary text-base leading-snug">{venue.name}</h3>
-        <span className="text-text-muted text-xs whitespace-nowrap shrink-0 mt-0.5">
+        <span className="text-text-muted text-xs whitespace-nowrap shrink-0 mt-0.5 flex items-center gap-1">
           {venue.distance_miles} mi
+          <span className="text-[10px]">{expanded ? "▴" : "▾"}</span>
         </span>
+      </div>
+
+      <div
+        className={`grid transition-all duration-200 ease-out ${
+          expanded ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <p className="text-text-muted text-xs">{venue.address}</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mt-2 flex-wrap">

@@ -64,3 +64,20 @@ body {
   filter: invert(1) hue-rotate(180deg) saturate(1.3) brightness(1.1);
   opacity: 0.85;
 }
+
+.hand-img {
+  left: var(--left-desktop);
+  top: var(--top-desktop);
+  width: var(--hand-size);
+}
+
+/* Hand illustrations read as too small on narrow screens at their desktop-tuned
+   percentage sizes, so scale them up relative to the viewport on mobile. Position
+   can also differ per hand on mobile via --left-mobile/--top-mobile (see Hero.tsx). */
+@media (max-width: 767px) {
+  .hand-img {
+    left: var(--left-mobile);
+    top: var(--top-mobile);
+    width: calc(var(--hand-size) * 2);
+  }
+}

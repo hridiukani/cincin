@@ -12,15 +12,31 @@ interface HeroProps {
 // Every source image is drawn with the wrist pointing down-left, so hands
 // resting on the right side need `flip: true` (mirrored horizontally) to
 // read as reaching in from the right instead of from the center.
-const HANDS = [
-  { src: "/hands/hand-1.png", alt: "Hand holding a tall highball cocktail", left: 2, top: 2, size: 20, rot: 20 },
-  { src: "/hands/hand-2.png", alt: "Hand holding a rocks glass with citrus", left: 80, top: 25, size: 21, rot: -20, flip: true },
-  { src: "/hands/hand-3.png", alt: "Hand holding a coupe with a straw", left: -2, top: 70, size: 22, rot: -8 ,flip: true},
-  { src: "/hands/hand-4.png", alt: "Hand holding a champagne flute", left: 79, top: 60, size: 22, rot: -10, flip: true },
-  { src: "/hands/hand-5.png", alt: "Hand tilting a martini with a cherry", left: 30, top: -4, size: 18, rot: 30 },
-  { src: "/hands/hand-6.png", alt: "Hand holding a beer mug", left: 41, top: 70, size: 19, rot: -10 },
-  { src: "/hands/hand-7.png", alt: "Hand holding a glass of red wine", left: 15, top: 30, size: 16, rot: 16 },
-  { src: "/hands/hand-8.png", alt: "Hand holding a margarita", left: 65, top: 2, size: 16, rot: -16, flip: true },
+//
+// mobileLeft/mobileTop optionally override left/top under 768px — set them
+// on any hand you want repositioned on mobile without touching its desktop
+// spot. Omit them and the hand just uses left/top on mobile too.
+interface HandConfig {
+  src: string;
+  alt: string;
+  left: number;
+  top: number;
+  size: number;
+  rot: number;
+  flip?: boolean;
+  mobileLeft?: number;
+  mobileTop?: number;
+}
+
+const HANDS: HandConfig[] = [
+  { src: "/hands/hand-1.png", alt: "Hand holding a tall highball cocktail", left: 2, top: 2, size: 20, rot: 20,mobileLeft: -7, mobileTop: 10 },
+  { src: "/hands/hand-2.png", alt: "Hand holding a rocks glass with citrus", left: 80, top: 25, size: 21, rot: -20, flip: true, mobileLeft: 60, mobileTop: 25 },
+  { src: "/hands/hand-3.png", alt: "Hand holding a coupe with a straw", left: -2, top: 70, size: 22, rot: -8 ,flip: true,mobileLeft: -2, mobileTop: 75},
+  { src: "/hands/hand-4.png", alt: "Hand holding a champagne flute", left: 79, top: 60, size: 22, rot: -10, flip: true,mobileLeft: 70, mobileTop: 65 },
+  { src: "/hands/hand-5.png", alt: "Hand tilting a martini with a cherry", left: 30, top: -4, size: 18, rot: 30,mobileLeft: 30, mobileTop: 0 },
+  { src: "/hands/hand-6.png", alt: "Hand holding a beer mug", left: 41, top: 70, size: 19, rot: 3,mobileLeft: 30, mobileTop: 83 },
+  { src: "/hands/hand-7.png", alt: "Hand holding a glass of red wine", left: 15, top: 30, size: 16, rot: 16,mobileLeft: 0, mobileTop: 35 },
+  { src: "/hands/hand-8.png", alt: "Hand holding a margarita", left: 65, top: 2, size: 16, rot: -16, flip: true,mobileLeft: 70, mobileTop: 8 },
 ];
 
 export default function Hero({ onSearch, isLoading }: HeroProps) {
@@ -39,13 +55,17 @@ export default function Hero({ onSearch, isLoading }: HeroProps) {
               alt={h.alt}
               width={768}
               height={768}
-              className="ink-art absolute select-none"
-              style={{
-                left: `${h.left}%`,
-                top: `${h.top}%`,
-                width: `${h.size}%`,
-                transform: `rotate(${h.rot}deg)${flip}`,
-              }}
+              className="ink-art hand-img absolute select-none"
+              style={
+                {
+                  "--left-desktop": `${h.left}%`,
+                  "--top-desktop": `${h.top}%`,
+                  "--left-mobile": `${h.mobileLeft ?? h.left}%`,
+                  "--top-mobile": `${h.mobileTop ?? h.top}%`,
+                  "--hand-size": `${h.size}%`,
+                  transform: `rotate(${h.rot}deg)${flip}`,
+                } as React.CSSProperties
+              }
             />
           );
         })}

@@ -31,6 +31,77 @@ async def _goto(page, url: str) -> None:
     await _settle(page)
 
 
+# Phrases used by "are you 21?" style age-verification gates that many
+# bar/restaurant sites show before any real content.
+AGE_GATE_KEYWORDS = [
+    "are you 21",
+    "i am 21",
+    "yes, i'm 21",
+    "enter your birthday",
+    "verify your age",
+    "i am of legal drinking age",
+]
+
+def _has_text_selector(tag: str, keyword: str) -> str:
+    # Playwright's :has-text() needs its argument quoted; switch to double
+    # quotes for any keyword (e.g. "i'm 21") that itself contains an apostrophe.
+    if "'" in keyword:
+        return f'{tag}:has-text("{keyword}")'
+    return f"{tag}:has-text('{keyword}')"
+
+
+_AGE_GATE_BUTTON_SELECTOR = ", ".join(
+    _has_text_selector(tag, kw)
+    for tag in ("button", "a")
+    for kw in ("yes", "i am 21", "i'm 21", "enter")
+)
+
+_AGE_GATE_YEAR_INPUT_SELECTOR = (
+    "input[name*='year' i], input[id*='year' i], input[placeholder*='year' i], "
+    "input[name*='birth' i], input[id*='birth' i]"
+)
+
+_AGE_GATE_SUBMIT_SELECTOR = (
+    "button[type='submit'], button:has-text('enter'), button:has-text('submit'), button:has-text('confirm')"
+)
+
+
+async def _bypass_age_gate(page, label: str) -> None:
+    try:
+        body_text = (await page.inner_text("body")).lower()
+    except PlaywrightError:
+        return
+
+    if not any(keyword in body_text for keyword in AGE_GATE_KEYWORDS):
+        return
+
+    # Try a "Yes" / "I am 21" / "Enter" button first.
+    button = page.locator(_AGE_GATE_BUTTON_SELECTOR).first
+    if await button.count() > 0:
+        try:
+            await button.click(timeout=3000)
+            await page.wait_for_timeout(2000)
+            print(f"{label} [age gate bypassed] {page.url}")
+            return
+        except PlaywrightError:
+            pass
+
+    # No clickable button: fall back to filling a birth year field and submitting.
+    year_input = page.locator(_AGE_GATE_YEAR_INPUT_SELECTOR).first
+    if await year_input.count() > 0:
+        try:
+            await year_input.fill("1995")
+            submit = page.locator(_AGE_GATE_SUBMIT_SELECTOR).first
+            if await submit.count() > 0:
+                await submit.click(timeout=3000)
+            else:
+                await year_input.press("Enter")
+            await page.wait_for_timeout(2000)
+            print(f"{label} [age gate bypassed] {page.url}")
+        except PlaywrightError:
+            pass
+
+
 # Keywords used to locate the deal-relevant part of a page's body text.
 _WINDOW_KEYWORDS = [
     "happy hour", "happy-hour", "hh", "specials", "lunch special",
@@ -122,6 +193,7 @@ async def load_page(url: str) -> dict | None:
         try:
             page = await browser.new_page()
             await _goto(page, url)
+            await _bypass_age_gate(page, "[scraper]")
             html = await page.content()
             text = _relevant_window(await page.inner_text("body"))
             print(f"[scraper] OK   {url}")
@@ -137,6 +209,7 @@ async def handle_link(browser: Browser, url: str) -> str | None:
     page = await browser.new_page()
     try:
         await _goto(page, url)
+        await _bypass_age_gate(page, "[handle_link]")
         text = _relevant_window(await page.inner_text("body"))
         print(f"[handle_link] OK   {url}")
         return text
@@ -178,6 +251,7 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
     page = await browser.new_page()
     try:
         await _goto(page, base_url)
+        await _bypass_age_gate(page, "[handle_location_selector]")
 
         option = page.locator(
             "a[href*='location' i], button:has-text('location'), "
@@ -189,6 +263,7 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
 
         await option.click()
         await _settle(page)
+        await _bypass_age_gate(page, "[handle_location_selector]")
 
         html = await page.content()
         text = _relevant_window(await page.inner_text("body"))

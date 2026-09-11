@@ -33,6 +33,7 @@ class VenueSearchResult(BaseModel):
     address: str
     lat: float
     lng: float
+    website: str | None
     google_rating: float | None
     distance_miles: float
     deal: DealOut
@@ -45,6 +46,7 @@ SEARCH_SQL = """
         v.address,
         v.lat,
         v.lng,
+        v.website,
         v.google_rating,
         ST_Distance(v.location, ST_MakePoint(:lng, :lat)::geography) / :meters_per_mile AS distance_miles,
         h.deal_type,
@@ -108,6 +110,7 @@ def search_venues(
             "address": row["address"],
             "lat": row["lat"],
             "lng": row["lng"],
+            "website": row["website"],
             "google_rating": row["google_rating"],
             "distance_miles": round(row["distance_miles"], 2),
             "deal": {

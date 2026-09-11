@@ -24,7 +24,7 @@ FIELD_MASK = ",".join(
     ]
 )
 
-PLACE_TYPES = ["bar", "restaurant"]
+PLACE_TYPES = ["bar", "restaurant", "brewery"]
 NEXT_PAGE_TOKEN_DELAY_SECONDS = 2
 
 

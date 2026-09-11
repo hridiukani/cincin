@@ -99,6 +99,18 @@ export default function VenueCard({ venue, isSelected, onClick }: VenueCardProps
       {venue.google_rating != null && (
         <p className="text-primary text-xs mt-2">★ {venue.google_rating}</p>
       )}
+
+      {venue.website && (
+        <a
+          href={venue.website}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover transition"
+        >
+          Visit website ↗
+        </a>
+      )}
     </div>
   );
 }

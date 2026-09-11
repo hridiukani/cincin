@@ -21,6 +21,7 @@ export interface Venue {
   address: string;
   lat: number;
   lng: number;
+  website: string | null;
   google_rating: number | null;
   distance_miles: number;
   deal: Deal;

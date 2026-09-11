@@ -75,6 +75,15 @@ STRICT_SYSTEM_PROMPT = (
     "Return only the JSON object."
 )
 
+IMAGE_SOURCE_NOTE = (
+    "\nNOTE: This text was not scraped from a webpage — it's a description of a "
+    "restaurant menu photo, produced by an image-understanding model. Treat it as "
+    "a plain-language summary of what's visible in the photo rather than raw page "
+    "copy: it may be less structured, and days/times may be phrased loosely (e.g. "
+    "written across a physical sign). Infer reasonably from context, but do not "
+    "fabricate any detail that isn't actually present in the description.\n"
+)
+
 
 def _build_user_content(text: str, venue_name: str) -> str:
     snippet = text[:MAX_INPUT_CHARS]
@@ -131,17 +140,20 @@ def _parse_and_validate(content: str) -> dict | None:
     return parsed if _validate(parsed) else None
 
 
-def extract_happy_hour(text: str, venue_name: str) -> dict | None:
+def extract_happy_hour(text: str, venue_name: str, image_source: bool = False) -> dict | None:
     if not text or not text.strip():
         return None
 
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
     user_content = _build_user_content(text, venue_name)
 
-    parsed = _parse_and_validate(_call_groq(client, SYSTEM_PROMPT, user_content))
+    system_prompt = SYSTEM_PROMPT + IMAGE_SOURCE_NOTE if image_source else SYSTEM_PROMPT
+    strict_prompt = STRICT_SYSTEM_PROMPT + IMAGE_SOURCE_NOTE if image_source else STRICT_SYSTEM_PROMPT
+
+    parsed = _parse_and_validate(_call_groq(client, system_prompt, user_content))
     if parsed is None:
         # Retry once with a stricter prompt before giving up.
-        parsed = _parse_and_validate(_call_groq(client, STRICT_SYSTEM_PROMPT, user_content))
+        parsed = _parse_and_validate(_call_groq(client, strict_prompt, user_content))
 
     if parsed is None or not parsed["has_deal"]:
         return None

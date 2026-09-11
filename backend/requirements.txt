@@ -11,3 +11,4 @@ httpx
 google-auth
 requests
 beautifulsoup4
+google-genai

@@ -65,7 +65,7 @@ async def _process_venue(db, venue, index, total):
         return "failed"
 
     try:
-        extraction = extract_happy_hour(result["text"], venue.name)
+        extraction = extract_happy_hour(result["text"], venue.name, image_source=(pattern == "image_menu"))
     except Exception as e:
         print(f"{label} → pattern: {pattern} → extracted: no (extract error: {e})")
         return "failed"

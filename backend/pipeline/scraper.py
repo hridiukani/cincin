@@ -1,14 +1,23 @@
 import asyncio
+import os
 import re
 from urllib.parse import urljoin
 
 import fitz
 import httpx
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types as genai_types
 from playwright.async_api import Browser
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
+
+load_dotenv()
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_MODEL = "gemini-1.5-flash"
 
 PAGE_TIMEOUT_MS = 15_000
 # Best-effort extra wait for JS-rendered content once the DOM is ready. Many
@@ -156,7 +165,34 @@ def _pdf_is_relevant(link_text: str, href: str) -> bool:
     return any(keyword in haystack for keyword in PDF_KEYWORDS)
 
 
-def detect_pattern(html: str, text: str) -> dict:
+# An <img> is only worth sending to Gemini if its src/alt/surrounding-anchor
+# text hints it's a menu or deal image (not a logo, hero photo, food photo, etc).
+IMAGE_MENU_KEYWORDS = ("menu", "happy", "special", "deal", "hour", "hh")
+
+# Link-shortener domains commonly used for QR codes on printed table cards,
+# which often point straight at a photographed menu image.
+QR_SHORTLINK_DOMAINS = ("qrco.de", "qr.io", "bit.ly")
+
+
+def _mentions_image_menu(*texts: str) -> bool:
+    haystack = " ".join(t or "" for t in texts).lower()
+    return any(keyword in haystack for keyword in IMAGE_MENU_KEYWORDS)
+
+
+def _is_qr_shortlink(href: str) -> bool:
+    return any(domain in href.lower() for domain in QR_SHORTLINK_DOMAINS)
+
+
+async def _resolves_to_image(url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            async with client.stream("GET", url) as response:
+                return response.headers.get("content-type", "").startswith("image/")
+    except httpx.HTTPError:
+        return False
+
+
+async def detect_pattern(html: str, text: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     anchors = soup.find_all("a", href=True)
 
@@ -183,6 +219,27 @@ def detect_pattern(html: str, text: str) -> dict:
     # 4. Happy-hour content sitting directly in the page text.
     if HH_KEYWORDS.search(text) and TIME_RANGE.search(text):
         return {"pattern": "inline", "target": None}
+
+    # 5. After everything else fails: an <img> whose src/alt/surrounding-anchor
+    #    text hints at a menu or deal — some venues only post their happy hour
+    #    as a photographed menu, not real text.
+    for img in soup.find_all("img"):
+        src = img.get("src")
+        if not src:
+            continue
+        alt = img.get("alt", "")
+        parent_a = img.find_parent("a")
+        anchor_text = parent_a.get_text(" ", strip=True) if parent_a else ""
+        anchor_href = parent_a.get("href", "") if parent_a else ""
+        if _mentions_image_menu(src, alt, anchor_text, anchor_href):
+            return {"pattern": "image_menu", "target": src}
+
+    # 6. A QR-code shortlink (from a printed table card) that resolves directly
+    #    to an image — likely a photographed menu.
+    for a in anchors:
+        href = a["href"]
+        if _is_qr_shortlink(href) and await _resolves_to_image(href):
+            return {"pattern": "image_menu", "target": href}
 
     return {"pattern": "none", "target": None}
 
@@ -247,6 +304,53 @@ async def handle_pdf(pdf_url: str) -> str | None:
         doc.close()
 
 
+GEMINI_IMAGE_PROMPT = (
+    "You are extracting happy hour or food/drink deal information from a "
+    "restaurant menu image. Extract all deals, times, and days visible in "
+    "the image. If no deal information is present, return null."
+)
+
+
+async def handle_image_menu(image_url: str) -> str | None:
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            response = await client.get(image_url)
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        print(f"[handle_image_menu] FAIL {image_url} - download error: {e}")
+        return None
+
+    content_type = response.headers.get("content-type", "").split(";")[0].strip()
+    if not content_type.startswith("image/"):
+        print(f"[handle_image_menu] FAIL {image_url} - not an image (content-type: {content_type or 'unknown'})")
+        return None
+
+    if not GEMINI_API_KEY:
+        print(f"[handle_image_menu] FAIL {image_url} - GEMINI_API_KEY not configured")
+        return None
+
+    try:
+        client_ai = genai.Client(api_key=GEMINI_API_KEY)
+        result = await client_ai.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                GEMINI_IMAGE_PROMPT,
+                genai_types.Part.from_bytes(data=response.content, mime_type=content_type),
+            ],
+        )
+        result_text = (result.text or "").strip()
+    except Exception as e:
+        print(f"[handle_image_menu] FAIL {image_url} - Gemini error: {type(e).__name__}: {e}")
+        return None
+
+    if not result_text or result_text.lower().rstrip(".") == "null":
+        print(f"[handle_image_menu] OK   {image_url} - no deal info found")
+        return None
+
+    print(f"[handle_image_menu] OK   {image_url}")
+    return result_text
+
+
 async def handle_location_selector(browser: Browser, base_url: str) -> str | None:
     page = await browser.new_page()
     try:
@@ -270,7 +374,7 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
 
         # After selecting a location the real content is loaded, so re-detect:
         # the happy-hour info may now sit behind a fresh link to follow.
-        detected = detect_pattern(html, text)
+        detected = await detect_pattern(html, text)
         if detected["pattern"] == "link" and detected["target"]:
             followed = await handle_link(browser, urljoin(page.url, detected["target"]))
             if followed is not None:
@@ -294,7 +398,7 @@ async def scrape_venue(venue: dict) -> dict:
     if page_data is None:
         return {"text": "", "pattern": "none", "success": False}
 
-    detected = detect_pattern(page_data["html"], page_data["text"])
+    detected = await detect_pattern(page_data["html"], page_data["text"])
     pattern = detected["pattern"]
     target = detected["target"]
 
@@ -304,6 +408,10 @@ async def scrape_venue(venue: dict) -> dict:
 
     if pattern == "pdf":
         text = await handle_pdf(urljoin(url, target))
+        return {"text": text or "", "pattern": pattern, "success": text is not None}
+
+    if pattern == "image_menu":
+        text = await handle_image_menu(urljoin(url, target))
         return {"text": text or "", "pattern": pattern, "success": text is not None}
 
     async with async_playwright() as p:

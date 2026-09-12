@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from db.database import SessionLocal
-from db.models import ScrapeLog, Venue
+from db.models import HappyHour, ScrapeLog, Venue
 from pipeline.extractor import extract_happy_hour
 from pipeline.logger import log_scrape, save_happy_hour
 from pipeline.scraper import scrape_venue
@@ -47,6 +47,21 @@ def _fetch_failed_venues(db, venue_id, limit):
     return venues
 
 
+def _fetch_none_venues(db, venue_id, limit):
+    # Scraped successfully at least once, but never produced a happy_hours row.
+    successful_ids = db.query(ScrapeLog.venue_id).filter(ScrapeLog.success.is_(True)).distinct()
+    has_deal_ids = db.query(HappyHour.venue_id).distinct()
+    query = db.query(Venue).filter(Venue.id.in_(successful_ids), Venue.id.notin_(has_deal_ids))
+    if venue_id:
+        query = query.filter(Venue.id == venue_id)
+    query = query.order_by(Venue.name)
+    venues = query.all()
+    if limit is not None:
+        venues = venues[:limit]
+    print(f"Retrying {len(venues)} venues that scraped successfully but found no deal")
+    return venues
+
+
 async def _process_venue(db, venue, index, total):
     label = f"[{index}/{total}] {venue.name}"
 
@@ -79,12 +94,14 @@ async def _process_venue(db, venue, index, total):
     return "extracted"
 
 
-async def run(venue_id=None, limit=None, skip=False, retry_failed=False):
+async def run(venue_id=None, limit=None, skip=False, retry_failed=False, retry_none=False):
     db = SessionLocal()
     counts = {"extracted": 0, "no_hh": 0, "failed": 0}
     try:
         if retry_failed:
             venues = _fetch_failed_venues(db, venue_id, limit)
+        elif retry_none:
+            venues = _fetch_none_venues(db, venue_id, limit)
         else:
             venues = _fetch_venues(db, venue_id, limit, skip=skip)
         total = len(venues)
@@ -117,10 +134,21 @@ def main():
         action="store_true",
         help="Only run venues with a failed scrape_log row (ignores --skip for those venues)",
     )
+    parser.add_argument(
+        "--retry-none",
+        action="store_true",
+        help="Only run venues that scraped successfully but found no deal (e.g. to pick up image_menu detection)",
+    )
     args = parser.parse_args()
 
     asyncio.run(
-        run(venue_id=args.venue_id, limit=args.limit, skip=args.skip, retry_failed=args.retry_failed)
+        run(
+            venue_id=args.venue_id,
+            limit=args.limit,
+            skip=args.skip,
+            retry_failed=args.retry_failed,
+            retry_none=args.retry_none,
+        )
     )
 
 

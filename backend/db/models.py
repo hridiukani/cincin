@@ -85,7 +85,7 @@ class ScrapeLog(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "pattern_detected IN ('link', 'location_selector', 'pdf', 'inline', 'image_menu', 'none')",
+            "pattern_detected IN ('link', 'location_selector', 'pdf', 'inline', 'image_menu', 'subpath', 'none')",
             name="scrape_log_pattern_detected_check",
         ),
         Index("idx_scrape_log_venue_id", "venue_id"),

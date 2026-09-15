@@ -35,9 +35,10 @@ async def _settle(page) -> None:
         pass
 
 
-async def _goto(page, url: str) -> None:
-    await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+async def _goto(page, url: str):
+    response = await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
     await _settle(page)
+    return response
 
 
 # Phrases used by "are you 21?" style age-verification gates that many
@@ -439,6 +440,61 @@ async def handle_location_selector(browser: Browser, base_url: str) -> str | Non
         await page.close()
 
 
+# Paths worth guessing when the homepage itself gives no signal — many sites
+# keep their happy hour / specials info on a dedicated page that just isn't
+# linked from anywhere detect_pattern() looks (nav menus buried in JS, etc).
+COMMON_SUBPATHS = (
+    "/happy-hour",
+    "/happyhour",
+    "/happy_hour",
+    "/specials",
+    "/drink-specials",
+    "/drinks",
+    "/menu",
+    "/menus",
+    "/food-and-drinks",
+    "/deals",
+    "/promotions",
+    "/offers",
+    "/events",
+)
+
+SUBPATH_KEYWORDS = ("happy hour", "specials", "deals", "discount", "$", "half off", "% off")
+
+
+def _mentions_subpath_deal(text: str) -> bool:
+    haystack = text.lower()
+    return any(keyword in haystack for keyword in SUBPATH_KEYWORDS)
+
+
+async def try_common_paths(browser: Browser, base_url: str) -> str | None:
+    page = await browser.new_page()
+    try:
+        for path in COMMON_SUBPATHS:
+            url = urljoin(base_url, path)
+            try:
+                response = await _goto(page, url)
+            except (PlaywrightTimeoutError, PlaywrightError):
+                continue
+
+            # A soft-404 (many sites resolve any unknown path to a 200 status
+            # error page) would otherwise slip through on status alone —
+            # that's exactly what the keyword check below guards against.
+            if response is None or response.status != 200:
+                continue
+
+            await _bypass_age_gate(page, "[try_common_paths]")
+            text = await page.inner_text("body")
+            if _mentions_subpath_deal(text):
+                print(f"[try_common_paths] OK   {url}")
+                return _relevant_window(text)
+
+        print(f"[try_common_paths] FAIL {base_url} - no common subpath had deal content")
+        return None
+    finally:
+        await page.close()
+
+
 async def scrape_venue(venue: dict) -> dict:
     url = venue.get("website")
     if not url:
@@ -452,7 +508,7 @@ async def scrape_venue(venue: dict) -> dict:
     pattern = detected["pattern"]
     target = detected["target"]
 
-    if pattern in ("inline", "none"):
+    if pattern == "inline":
         text = page_data["text"]
         return {"text": text, "pattern": pattern, "success": bool(text)}
 
@@ -463,6 +519,18 @@ async def scrape_venue(venue: dict) -> dict:
     if pattern == "image_menu":
         text = await handle_image_menu(urljoin(url, target))
         return {"text": text or "", "pattern": pattern, "success": text is not None}
+
+    if pattern == "none":
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
+                subpath_text = await try_common_paths(browser, url)
+            finally:
+                await browser.close()
+        if subpath_text:
+            return {"text": subpath_text, "pattern": "subpath", "success": True}
+        text = page_data["text"]
+        return {"text": text, "pattern": pattern, "success": bool(text)}
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)

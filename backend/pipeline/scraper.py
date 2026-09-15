@@ -254,6 +254,9 @@ def detect_pattern(html: str, text: str) -> dict:
 
 
 async def load_page(url: str) -> dict | None:
+    if url.startswith("http://"):
+        url = "https://" + url[len("http://"):]
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:

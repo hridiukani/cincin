@@ -13,6 +13,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://cincin-alpha.vercel.app",
+        "https://cincin.hridi.space",
         "http://localhost:3000",
     ],
     allow_credentials=True,

@@ -5,6 +5,7 @@ sqlalchemy
 geoalchemy2
 python-dotenv
 playwright
+playwright-stealth
 groq
 pymupdf
 httpx

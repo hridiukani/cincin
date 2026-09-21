@@ -13,11 +13,35 @@ from playwright.async_api import Browser
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
 
 load_dotenv()
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-3.6-flash"
+
+_stealth = Stealth()
+
+# Launch flags that make headless Chromium look less like a bot: the default
+# UA/platform report as "HeadlessChrome" on Linux, and navigator.webdriver is
+# true by default — both are checked by Cloudflare and similar bot filters.
+STEALTH_LAUNCH_ARGS = [
+    "--no-sandbox",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-dev-shm-usage",
+]
+
+def _desktop_user_agent(browser: Browser) -> str:
+    # Headless Chromium's default UA advertises "HeadlessChrome" on a Linux
+    # platform token — a giveaway on its own. Rebuild it around the browser's
+    # real version (rather than a hardcoded one, which would drift out of
+    # sync with the bundled Chromium and become a mismatch signal of its own)
+    # with a common desktop platform instead.
+    return (
+        f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        f"(KHTML, like Gecko) Chrome/{browser.version} Safari/537.36"
+    )
+
 
 PAGE_TIMEOUT_MS = 15_000
 # Best-effort extra wait for JS-rendered content once the DOM is ready. Many
@@ -258,9 +282,10 @@ async def load_page(url: str) -> dict | None:
         url = "https://" + url[len("http://"):]
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(headless=True, args=STEALTH_LAUNCH_ARGS)
         try:
-            page = await browser.new_page()
+            page = await browser.new_page(user_agent=_desktop_user_agent(browser))
+            await _stealth.apply_stealth_async(page)
             await _goto(page, url)
             await _bypass_age_gate(page, "[scraper]")
             html = await page.content()

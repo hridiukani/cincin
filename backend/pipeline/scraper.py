@@ -277,6 +277,50 @@ def detect_pattern(html: str, text: str) -> dict:
     return {"pattern": "none", "target": None}
 
 
+# Third-party ordering/menu platforms restaurants commonly embed via iframe
+# instead of putting the content directly in their own HTML.
+IFRAME_MENU_PLATFORM_DOMAINS = (
+    "toasttab.com",
+    "squareup.com",
+    "bentobox.com",
+    "olo.com",
+    "bopple.com",
+    "menu.com",
+)
+IFRAME_URL_KEYWORDS = ("menu", "happy", "specials", "drinks")
+
+
+def _iframe_worth_extracting(frame_url: str) -> bool:
+    haystack = frame_url.lower()
+    if any(domain in haystack for domain in IFRAME_MENU_PLATFORM_DOMAINS):
+        return True
+    return any(keyword in haystack for keyword in IFRAME_URL_KEYWORDS)
+
+
+async def _extract_iframe_text(page) -> str:
+    # page.frames already gives every frame Playwright has attached to the
+    # tab — including cross-origin ones — with each frame's real, resolved
+    # URL. That's what we match against, rather than re-looking-up frames by
+    # their raw <iframe src> attribute: src can be relative or differ from
+    # the frame's actual loaded URL (redirects, etc.), and page.frame(url=...)
+    # matches as a glob pattern, so matching on frame.url directly is both
+    # simpler and more reliable.
+    chunks = []
+    for frame in page.frames:
+        if frame == page.main_frame:
+            continue
+        url = frame.url
+        if not url or not _iframe_worth_extracting(url):
+            continue
+        try:
+            text = (await frame.inner_text("body")).strip()
+        except PlaywrightError:
+            continue
+        if text:
+            chunks.append(text)
+    return "\n\n".join(chunks)
+
+
 async def load_page(url: str) -> dict | None:
     if url.startswith("http://"):
         url = "https://" + url[len("http://"):]
@@ -290,7 +334,14 @@ async def load_page(url: str) -> dict | None:
             await _bypass_age_gate(page, "[scraper]")
             html = await page.content()
             text = _relevant_window(await page.inner_text("body"))
-            print(f"[scraper] OK   {url}")
+
+            iframe_text = await _extract_iframe_text(page)
+            if iframe_text:
+                text = f"{text}\n\n{iframe_text}"
+                print(f"[scraper] OK   {url} (+iframe content)")
+            else:
+                print(f"[scraper] OK   {url}")
+
             return {"html": html, "text": text}
         except (PlaywrightTimeoutError, PlaywrightError) as e:
             print(f"[scraper] FAIL {url} - {type(e).__name__}: {str(e).splitlines()[0]}")

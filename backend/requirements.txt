@@ -13,3 +13,4 @@ google-auth
 requests
 beautifulsoup4
 google-genai
+mcp==2.2.0

@@ -11,6 +11,25 @@ import type { SearchOptions, Venue } from "@/lib/types";
 
 type Phase = "idle" | "loading" | "results" | "error";
 
+const FEEDBACK_URL = process.env.NEXT_PUBLIC_FEEDBACK_URL;
+
+function FeedbackLink({ prompt, linkText }: { prompt: string; linkText: string }) {
+  if (!FEEDBACK_URL) return null;
+  return (
+    <p className="text-sm text-text-muted">
+      {prompt}{" "}
+      <a
+        href={FEEDBACK_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:text-primary-hover transition"
+      >
+        {linkText}
+      </a>
+    </p>
+  );
+}
+
 export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -68,8 +87,8 @@ export default function Home() {
             <div className="p-4">
               {venues.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-16 gap-2">
-                  
                   <p className="text-text-muted">No deals found, try a larger radius</p>
+                  <FeedbackLink prompt="Know a spot we're missing?" linkText="Tell us" />
                 </div>
               ) : (
                 <>
@@ -85,6 +104,9 @@ export default function Home() {
                         onClick={() => setSelectedVenueId(venue.id)}
                       />
                     ))}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <FeedbackLink prompt="Missing a bar or see a wrong deal?" linkText="Tell us" />
                   </div>
                 </>
               )}
